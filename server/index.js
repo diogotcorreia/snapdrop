@@ -14,6 +14,9 @@ process.on('SIGTERM', () => {
 const parser = require('ua-parser-js');
 const { uniqueNamesGenerator, animals, colors } = require('unique-names-generator');
 
+const GLOBAL_ROOM_NAME = '__GLOBAL_ROOM__';
+const USE_GLOBAL_ROOM_BY_DEFAULT = process.env.USE_GLOBAL_ROOM_BY_DEFAULT === 'true';
+
 class SnapdropServer {
   constructor(port) {
     const WebSocket = require('ws');
@@ -49,6 +52,7 @@ class SnapdropServer {
   }
 
   _onMessage(sender, message) {
+    console.log(this._rooms);
     // Try to parse message
     try {
       message = JSON.parse(message);
@@ -66,9 +70,9 @@ class SnapdropServer {
     }
 
     // relay message to recipient
-    if (message.to && this._rooms[sender.ip]) {
+    if (message.to && this._rooms[sender.getRoom()]) {
       const recipientId = message.to; // TODO: sanitize
-      const recipient = this._rooms[sender.ip][recipientId];
+      const recipient = this._rooms[sender.getRoom()][recipientId];
       delete message.to;
       // add sender id
       message.sender = sender.id;
@@ -79,13 +83,13 @@ class SnapdropServer {
 
   _joinRoom(peer) {
     // if room doesn't exist, create it
-    if (!this._rooms[peer.ip]) {
-      this._rooms[peer.ip] = {};
+    if (!this._rooms[peer.getRoom()]) {
+      this._rooms[peer.getRoom()] = {};
     }
 
     // notify all other peers
-    for (const otherPeerId in this._rooms[peer.ip]) {
-      const otherPeer = this._rooms[peer.ip][otherPeerId];
+    for (const otherPeerId in this._rooms[peer.getRoom()]) {
+      const otherPeer = this._rooms[peer.getRoom()][otherPeerId];
       this._send(otherPeer, {
         type: 'peer-joined',
         peer: peer.getInfo(),
@@ -94,8 +98,8 @@ class SnapdropServer {
 
     // notify peer about the other peers
     const otherPeers = [];
-    for (const otherPeerId in this._rooms[peer.ip]) {
-      otherPeers.push(this._rooms[peer.ip][otherPeerId].getInfo());
+    for (const otherPeerId in this._rooms[peer.getRoom()]) {
+      otherPeers.push(this._rooms[peer.getRoom()][otherPeerId].getInfo());
     }
 
     this._send(peer, {
@@ -104,24 +108,24 @@ class SnapdropServer {
     });
 
     // add peer to room
-    this._rooms[peer.ip][peer.id] = peer;
+    this._rooms[peer.getRoom()][peer.id] = peer;
   }
 
   _leaveRoom(peer) {
-    if (!this._rooms[peer.ip] || !this._rooms[peer.ip][peer.id]) return;
-    this._cancelKeepAlive(this._rooms[peer.ip][peer.id]);
+    if (!this._rooms[peer.getRoom()] || !this._rooms[peer.getRoom()][peer.id]) return;
+    this._cancelKeepAlive(this._rooms[peer.getRoom()][peer.id]);
 
     // delete the peer
-    delete this._rooms[peer.ip][peer.id];
+    delete this._rooms[peer.getRoom()][peer.id];
 
     peer.socket.terminate();
     //if room is empty, delete the room
-    if (!Object.keys(this._rooms[peer.ip]).length) {
-      delete this._rooms[peer.ip];
+    if (!Object.keys(this._rooms[peer.getRoom()]).length) {
+      delete this._rooms[peer.getRoom()];
     } else {
       // notify all other peers
-      for (const otherPeerId in this._rooms[peer.ip]) {
-        const otherPeer = this._rooms[peer.ip][otherPeerId];
+      for (const otherPeerId in this._rooms[peer.getRoom()]) {
+        const otherPeer = this._rooms[peer.getRoom()][otherPeerId];
         this._send(otherPeer, { type: 'peer-left', peerId: peer.id });
       }
     }
@@ -174,6 +178,9 @@ class Peer {
     // for keepalive
     this.timerId = 0;
     this.lastBeat = Date.now();
+    // handle custom rooms
+    this.room = GLOBAL_ROOM_NAME;
+    this.useLocalRoom = !USE_GLOBAL_ROOM_BY_DEFAULT;
   }
 
   _setIP(request) {
@@ -241,6 +248,13 @@ class Peer {
       name: this.name,
       rtcSupported: this.rtcSupported,
     };
+  }
+
+  getRoom() {
+    if (this.useLocalRoom) {
+      return this.ip;
+    }
+    return this.room;
   }
 
   // return uuid of form xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx

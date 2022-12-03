@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "format": "prettier --config ../.prettierrc.json --write index.js ../client/**/*.{js,css,html,json}"
   },
   "author": "",
   "license": "ISC",
@@ -12,5 +14,9 @@
     "ua-parser-js": "^0.7.24",
     "unique-names-generator": "^4.3.0",
     "ws": "^7.4.6"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.20",
+    "prettier": "^2.8.0"
   }
 }

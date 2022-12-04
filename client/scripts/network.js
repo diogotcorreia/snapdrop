@@ -43,6 +43,9 @@ class ServerConnection {
       case 'display-name':
         Events.fire('display-name', msg);
         break;
+      case 'room':
+        Events.fire('room', msg);
+        break;
       default:
         console.error('WS: unkown message type', msg);
     }
@@ -374,6 +377,7 @@ class PeersManager {
     Events.on('files-selected', (e) => this._onFilesSelected(e.detail));
     Events.on('send-text', (e) => this._onSendText(e.detail));
     Events.on('peer-left', (e) => this._onPeerLeft(e.detail));
+    Events.on('change-room', (e) => this._onChangeRoom(e.detail));
   }
 
   _onMessage(message) {
@@ -414,6 +418,10 @@ class PeersManager {
     delete this.peers[peerId];
     if (!peer || !peer._peer) return;
     peer._peer.close();
+  }
+
+  _onChangeRoom(roomState) {
+    this._server.send({ type: 'changeRoom', roomState });
   }
 }
 

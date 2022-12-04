@@ -24,3 +24,4 @@ Refer to the [original project](https://github.com/RobinLinus/snapdrop) for how 
 I've forked the original project and made the following changes, which fit my usecase.
 
 - Configure and run formatter (Prettier)
+- Support a global room where anyone can see each other without being in the same network (good for small, private, servers)

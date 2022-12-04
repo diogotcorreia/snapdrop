@@ -1,0 +1,12 @@
+# Caddyfile for local development
+
+:5000 {
+	file_server {
+		index index.html
+		root ./client
+	}
+	route /server/* {
+		uri strip_prefix /server
+		reverse_proxy localhost:3000
+	}
+}

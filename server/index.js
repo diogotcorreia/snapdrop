@@ -43,6 +43,8 @@ class SnapdropServer {
         deviceName: peer.name.deviceName,
       },
     });
+
+    this._sendRoomToPeer(peer);
   }
 
   _onHeaders(headers, response) {
@@ -52,7 +54,6 @@ class SnapdropServer {
   }
 
   _onMessage(sender, message) {
-    console.log(this._rooms);
     // Try to parse message
     try {
       message = JSON.parse(message);
@@ -66,6 +67,9 @@ class SnapdropServer {
         break;
       case 'pong':
         sender.lastBeat = Date.now();
+        break;
+      case 'changeRoom':
+        this._changeRoom(sender, message.roomState);
         break;
     }
 
@@ -111,14 +115,16 @@ class SnapdropServer {
     this._rooms[peer.getRoom()][peer.id] = peer;
   }
 
-  _leaveRoom(peer) {
+  _leaveRoom(peer, terminate = true) {
     if (!this._rooms[peer.getRoom()] || !this._rooms[peer.getRoom()][peer.id]) return;
-    this._cancelKeepAlive(this._rooms[peer.getRoom()][peer.id]);
+    if (terminate) {
+      this._cancelKeepAlive(this._rooms[peer.getRoom()][peer.id]);
+      peer.socket.terminate();
+    }
 
     // delete the peer
     delete this._rooms[peer.getRoom()][peer.id];
 
-    peer.socket.terminate();
     //if room is empty, delete the room
     if (!Object.keys(this._rooms[peer.getRoom()]).length) {
       delete this._rooms[peer.getRoom()];
@@ -129,6 +135,24 @@ class SnapdropServer {
         this._send(otherPeer, { type: 'peer-left', peerId: peer.id });
       }
     }
+  }
+
+  _changeRoom(peer, roomState) {
+    this._leaveRoom(peer, false);
+    peer.setRoom(roomState);
+    this._joinRoom(peer);
+
+    this._sendRoomToPeer(peer);
+  }
+
+  _sendRoomToPeer(peer) {
+    this._send(peer, {
+      type: 'room',
+      message: {
+        room: peer.room,
+        useLocalRoom: peer.useLocalRoom,
+      },
+    });
   }
 
   _send(peer, message) {
@@ -255,6 +279,11 @@ class Peer {
       return this.ip;
     }
     return this.room;
+  }
+
+  setRoom({ room, useLocalRoom }) {
+    this.room = String(room);
+    this.useLocalRoom = Boolean(useLocalRoom);
   }
 
   // return uuid of form xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx

@@ -483,6 +483,44 @@ class Notifications {
   }
 }
 
+class RoomSelector {
+  constructor() {
+    Events.on('room', (e) => this._updateFromServer(e.detail.message));
+
+    this._roomState = {
+      room: '',
+      useLocalRoom: true,
+    };
+
+    this.$buttons = [$('local-room'), $('global-room')];
+    this.$buttons.forEach((el) => el.addEventListener('click', (e) => this._toggleRoom()));
+  }
+
+  _updateFromServer({ room, useLocalRoom }) {
+    this._roomState = { room, useLocalRoom };
+    console.log(this._roomState);
+
+    const $roomMessage = $('footer-room');
+    const $lanIcon = $('local-room');
+    const $wanIcon = $('global-room');
+    if (useLocalRoom) {
+      $roomMessage.textContent = 'You can be discovered by everyone on your local network';
+      $lanIcon.hidden = false;
+      $wanIcon.hidden = true;
+    } else {
+      $roomMessage.textContent = 'You can be discovered by everyone';
+      $lanIcon.hidden = true;
+      $wanIcon.hidden = false;
+    }
+  }
+
+  _toggleRoom() {
+    this._roomState.useLocalRoom = !this._roomState.useLocalRoom;
+
+    Events.fire('change-room', this._roomState);
+  }
+}
+
 class NetworkStatusUI {
   constructor() {
     window.addEventListener('offline', (e) => this._showOfflineMessage(), false);
@@ -523,6 +561,7 @@ class Snapdrop {
     const server = new ServerConnection();
     const peers = new PeersManager(server);
     const peersUI = new PeersUI();
+    const roomSelector = new RoomSelector();
     Events.on('load', (e) => {
       const receiveDialog = new ReceiveDialog();
       const sendTextDialog = new SendTextDialog();
